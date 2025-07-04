@@ -1,98 +1,155 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# NestJS Persistent Job Scheduler
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Welcome! This project is a real-world, modular job scheduler built with NestJS and PostgreSQL. It's designed to be easy to extend, robust, and a great learning resource for anyone interested in backend scheduling, cron jobs, and scalable architecture.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+---
 
-## Description
+## 🚀 What's Inside?
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+- **Persistent jobs**: All jobs are stored in a PostgreSQL database, so nothing gets lost if your app restarts.
+- **Flexible scheduling**: Use cron expressions for both recurring and one-time jobs.
+- **No double work**: Built-in locking ensures no two workers ever run the same job at the same time.
+- **Do-anything jobs**: Jobs can be anything—send emails, clean up data, generate reports, you name it.
+- **Easy to extend**: The code is organized by feature, so adding new job types is a breeze.
+- **Beautiful API docs**: Full Swagger/OpenAPI docs are available at `/api`.
 
-## Project setup
+---
 
-```bash
-$ npm install
+## 🏗️ How the Project is Organized
+
+```
+src/
+  ├── jobs/         # Everything about jobs: entity, service, controller, module
+  ├── scheduler/    # The scheduler service and its module
+  ├── email/        # Email sending service and module
+  ├── cleanup/      # Data cleanup service and module
+  ├── report/       # Report generation service and module
+  ├── common/       # (for any shared utilities)
+  ├── app.module.ts # The main app module
+  ├── main.ts       # Entry point (also sets up Swagger)
+  ├── app.controller.ts, app.service.ts # Basic health check
 ```
 
-## Compile and run the project
+---
 
-```bash
-# development
-$ npm run start
+## 📝 Prerequisites
 
-# watch mode
-$ npm run start:dev
+Before you start, make sure you have:
 
-# production mode
-$ npm run start:prod
+- **Node.js** (v16 or higher recommended)
+- **npm** (comes with Node.js)
+- **PostgreSQL** (running locally or accessible remotely)
+- (Optional) **SMTP server credentials** if you want to test real email jobs (e.g., Gmail, Mailtrap, SendGrid, etc.)
+
+---
+
+## 🛠️ Getting Started
+
+1. **Install dependencies**
+   ```bash
+   npm install
+   ```
+2. **Set up your environment**
+
+   - Copy and edit `.env`:
+
+     ```env
+     # PostgreSQL
+     DB_HOST=localhost
+     DB_PORT=5432
+     DB_USER=postgres
+     DB_PASS=postgres
+     DB_NAME=jobscheduler
+
+     # SMTP (for real email sending)
+     SMTP_HOST=smtp.example.com
+     SMTP_PORT=587
+     SMTP_USER=your_smtp_user
+     SMTP_PASS=your_smtp_password
+     SMTP_FROM="Job Scheduler" <no-reply@example.com>
+     ```
+
+3. **Start the app**
+   ```bash
+   npm run start
+   ```
+4. **Explore the API**
+   - Open [http://localhost:3000/api](http://localhost:3000/api) in your browser for interactive docs and testing.
+
+---
+
+## 🔄 How Does It Work?
+
+1. **You create a job** using the API, specifying what to do, when, and any extra info (like email details).
+2. **The scheduler service** wakes up every minute (or as you configure), checks for jobs that are due, and locks them so only one worker can run them.
+3. **The right handler runs**: Based on the job type, the scheduler calls the right service (send email, clean up, generate report, etc.), passing along your metadata.
+4. **Status is updated**: The job's status and last run time are updated. If it's recurring, it's set up to run again next time.
+5. **No double execution**: Thanks to database-level locking, even if you scale out to multiple servers, each job only runs once per schedule.
+
+### Visual Flow
+
+```mermaid
+flowchart TD
+    A[API Client] -->|Create Job| B[JobController]
+    B -->|Save| C[JobService]
+    C -->|Insert| D[(PostgreSQL)]
+    E[SchedulerService] -->|Polls| D
+    D -->|Due Jobs| E
+    E -->|Lock & Dispatch| F[Job Handler Service]
+    F -->|Executes| G[External System/DB/Email]
+    F -->|Update Status| D
 ```
 
-## Run tests
+---
 
-```bash
-# unit tests
-$ npm run test
+## 📚 My Learnings
 
-# e2e tests
-$ npm run test:e2e
+Building a persistent job scheduler taught me how to:
 
-# test coverage
-$ npm run test:cov
+- **Decide when to run a job** using cron expressions for flexible scheduling.
+- **Support recurring jobs** and handle their re-execution automatically.
+- **Track the last execution time** of each job for monitoring and scheduling.
+- **Store and update the status** of each job (pending, running, completed, failed).
+- **Implement a locking mechanism** so only one worker can pick up a job at a time, preventing duplicate execution.
+- **Design jobs to be generic**, so the scheduler can handle any type of task.
+- **Use a metadata column** to store extra information for each job, making the system flexible.
+- **Handle recurring jobs** by resetting their status after execution.
+- **Use cron-based polling** (not setTimeout) to pick up and execute jobs reliably.
+
+---
+
+## 🧩 Want to Add More?
+
+- Just create a new service for your job type, register it in the scheduler, and you're good to go!
+- Add new API endpoints or metadata fields as your use case grows.
+
+---
+
+## 📝 Example: Creating a Job
+
+Here's what a job to send an email might look like:
+
+```json
+{
+  "name": "sendEmail",
+  "schedule": "*/5 * * * * *",
+  "isRecurring": false,
+  "metadata": {
+    "to": "user@example.com",
+    "subject": "Hello",
+    "body": "This is a test email"
+  }
+}
 ```
 
-## Deployment
+---
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+## 🤝 Contributing
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+Pull requests and suggestions are always welcome! If you have ideas for new job types or improvements, let's make it better together.
 
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
+---
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+## 📄 License
 
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+MIT — use it, learn from it, and build something awesome!
