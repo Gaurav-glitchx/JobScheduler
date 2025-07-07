@@ -8,6 +8,8 @@ export declare class Job {
     status: JobStatus;
     lockedAt: Date | null;
     metadata: Record<string, any>;
+    retryCount: number;
+    lastError: string | null;
     createdAt: Date;
     updatedAt: Date;
 }

@@ -12,7 +12,7 @@ var SchedulerService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SchedulerService = void 0;
 const common_1 = require("@nestjs/common");
-const cron_1 = require("cron");
+const schedule_1 = require("@nestjs/schedule");
 const job_service_1 = require("../jobs/job.service");
 const send_email_service_1 = require("../email/send-email.service");
 const cleanup_data_service_1 = require("../cleanup/cleanup-data.service");
@@ -23,17 +23,11 @@ let SchedulerService = SchedulerService_1 = class SchedulerService {
     cleanupDataService;
     generateReportService;
     logger = new common_1.Logger(SchedulerService_1.name);
-    poller;
     constructor(jobService, sendEmailService, cleanupDataService, generateReportService) {
         this.jobService = jobService;
         this.sendEmailService = sendEmailService;
         this.cleanupDataService = cleanupDataService;
         this.generateReportService = generateReportService;
-    }
-    onModuleInit() {
-        this.poller = new cron_1.CronJob('* * * * *', () => this.pollJobs());
-        this.poller.start();
-        this.logger.log('Job scheduler poller started (every minute)');
     }
     async pollJobs() {
         const now = new Date();
@@ -43,7 +37,6 @@ let SchedulerService = SchedulerService_1 = class SchedulerService {
                 this.logger.log(`Locked and executing job: ${job.id} (${job.name})`);
                 this.executeJob(job).catch((err) => {
                     this.logger.error(`Job ${job.id} failed: ${err}`);
-                    this.jobService.markJobExecuted(job.id, 'failed');
                 });
             }
         }
@@ -63,18 +56,46 @@ let SchedulerService = SchedulerService_1 = class SchedulerService {
                 default:
                     this.logger.warn(`Unknown job type: ${job.name}`);
             }
-            await this.jobService.markJobExecuted(job.id, 'completed');
+            await this.jobService.updateJob(job.id, {
+                status: 'completed',
+                retryCount: 0,
+                lastError: null,
+            });
             if (job.isRecurring) {
                 await this.jobService.updateJob(job.id, { status: 'pending' });
             }
         }
         catch (err) {
-            await this.jobService.markJobExecuted(job.id, 'failed');
-            throw err;
+            const retryCount = (job.retryCount || 0) + 1;
+            const maxRetries = 3;
+            if (retryCount < maxRetries) {
+                this.logger.warn(`Job ${job.id} failed (attempt ${retryCount}/${maxRetries}), will retry.`);
+                await this.jobService.updateJob(job.id, {
+                    status: 'pending',
+                    retryCount,
+                    lastError: err.message || String(err),
+                    lockedAt: null,
+                });
+            }
+            else {
+                this.logger.error(`Job ${job.id} failed after ${retryCount} attempts, marking as failed.`);
+                await this.jobService.updateJob(job.id, {
+                    status: 'failed',
+                    retryCount,
+                    lastError: err.message || String(err),
+                    lockedAt: null,
+                });
+            }
         }
     }
 };
 exports.SchedulerService = SchedulerService;
+__decorate([
+    (0, schedule_1.Cron)('* * * * *'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", Promise)
+], SchedulerService.prototype, "pollJobs", null);
 exports.SchedulerService = SchedulerService = SchedulerService_1 = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [job_service_1.JobService,

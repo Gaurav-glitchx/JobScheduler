@@ -9,6 +9,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AppModule = void 0;
 const common_1 = require("@nestjs/common");
 const typeorm_1 = require("@nestjs/typeorm");
+const schedule_1 = require("@nestjs/schedule");
 const database_1 = require("./common/database");
 const jobs_module_1 = require("./jobs/jobs.module");
 const scheduler_module_1 = require("./scheduler/scheduler.module");
@@ -22,6 +23,7 @@ exports.AppModule = AppModule = __decorate([
     (0, common_1.Module)({
         imports: [
             typeorm_1.TypeOrmModule.forRoot(database_1.typeOrmConfig),
+            schedule_1.ScheduleModule.forRoot(),
             jobs_module_1.JobsModule,
             scheduler_module_1.SchedulerModule,
             email_module_1.EmailModule,

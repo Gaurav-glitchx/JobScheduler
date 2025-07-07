@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThan, IsNull, Not } from 'typeorm';
 import { Job, JobStatus } from './entity/job.entity';
+import { CronTime } from 'cron';
 
 /**
  * Service responsible for all job-related database operations and business logic.
@@ -48,15 +49,22 @@ export class JobService {
 
   /**
    * Finds all jobs that are due to run right now.
-   * Only jobs that are not locked and are either pending or running are returned.
-   * This is how the scheduler knows which jobs to pick up next.
+   * Only jobs that are not locked, are pending, and whose schedule matches the current time are returned.
    */
   async findDueJobs(now: Date): Promise<Job[]> {
-    return this.jobRepository.find({
-      where: [
-        { lockedAt: IsNull(), status: 'pending' },
-        { lockedAt: IsNull(), status: 'running' },
-      ],
+    const jobs = await this.jobRepository.find({
+      where: [{ lockedAt: IsNull(), status: 'pending' }],
+    });
+    return jobs.filter((job) => {
+      try {
+        const cronTime = new CronTime(job.schedule);
+        const nextRun = cronTime
+          .getNextDateFrom(job.lastRunAt || new Date(0))
+          .toJSDate();
+        return nextRun.getTime() <= now.getTime();
+      } catch (e) {
+        return false;
+      }
     });
   }
 

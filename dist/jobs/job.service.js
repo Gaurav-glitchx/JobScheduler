@@ -17,6 +17,7 @@ const common_1 = require("@nestjs/common");
 const typeorm_1 = require("@nestjs/typeorm");
 const typeorm_2 = require("typeorm");
 const job_entity_1 = require("./entity/job.entity");
+const cron_1 = require("cron");
 let JobService = class JobService {
     jobRepository;
     constructor(jobRepository) {
@@ -37,11 +38,20 @@ let JobService = class JobService {
         return this.findById(id);
     }
     async findDueJobs(now) {
-        return this.jobRepository.find({
-            where: [
-                { lockedAt: (0, typeorm_2.IsNull)(), status: 'pending' },
-                { lockedAt: (0, typeorm_2.IsNull)(), status: 'running' },
-            ],
+        const jobs = await this.jobRepository.find({
+            where: [{ lockedAt: (0, typeorm_2.IsNull)(), status: 'pending' }],
+        });
+        return jobs.filter((job) => {
+            try {
+                const cronTime = new cron_1.CronTime(job.schedule);
+                const nextRun = cronTime
+                    .getNextDateFrom(job.lastRunAt || new Date(0))
+                    .toJSDate();
+                return nextRun.getTime() <= now.getTime();
+            }
+            catch (e) {
+                return false;
+            }
         });
     }
     async lockJob(id) {
