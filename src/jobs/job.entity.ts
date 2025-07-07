@@ -31,7 +31,10 @@ export class Job {
   @Column({ type: 'timestamp', nullable: true })
   lastRunAt: Date;
 
-  @ApiProperty({ example: 'pending', enum: ['pending', 'running', 'completed', 'failed'] })
+  @ApiProperty({
+    example: 'pending',
+    enum: ['pending', 'running', 'completed', 'failed'],
+  })
   @Column({ type: 'varchar', length: 32, default: 'pending' })
   status: JobStatus;
 
@@ -39,7 +42,11 @@ export class Job {
   @Column({ type: 'timestamp', nullable: true })
   lockedAt: Date | null;
 
-  @ApiProperty({ example: { to: 'user@example.com', subject: 'Hello' }, required: false, type: Object })
+  @ApiProperty({
+    example: { to: 'user@example.com', subject: 'Hello' },
+    required: false,
+    type: Object,
+  })
   @Column({ type: 'jsonb', nullable: true })
   metadata: Record<string, any>;
 
